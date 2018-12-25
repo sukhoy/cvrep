@@ -1,0 +1,121 @@
+unchanged:
+--- a/Makefile	2018-10-04 07:00:36.000000000 -0500
++++ b/Makefile	2018-12-20 23:48:00.000000000 -0600
+@@ -5,8 +5,10 @@
+ SHVER = 3
+ OS = $(shell uname)
+ #LIBS = -lblas
+ 
++override LIBS += SFMT/SFMT.o
++
+ all: train predict
+ 
+ lib: linear.o tron.o blas/blas.a
+ 	if [ "$(OS)" = "Darwin" ]; then \
+unchanged:
+--- a/Makefile.win	2018-10-04 07:00:36.000000000 -0500
++++ b/Makefile.win	2018-12-20 23:39:21.000000000 -0600
+@@ -3,22 +3,22 @@
+ TARGET = windows
+ 
+ all: $(TARGET)\train.exe $(TARGET)\predict.exe lib
+ 
+-$(TARGET)\train.exe: tron.obj linear.obj train.c blas\*.c
+-	$(CXX) $(CFLAGS) -Fe$(TARGET)\train.exe tron.obj linear.obj train.c blas\*.c
++$(TARGET)\train.exe: tron.obj linear.obj train.c blas\*.c SFMT\SFMT.c
++	$(CXX) $(CFLAGS) -Fe$(TARGET)\train.exe tron.obj linear.obj train.c blas\*.c SFMT\SFMT.c
+ 
+-$(TARGET)\predict.exe: tron.obj linear.obj predict.c blas\*.c
+-	$(CXX) $(CFLAGS) -Fe$(TARGET)\predict.exe tron.obj linear.obj predict.c blas\*.c
++$(TARGET)\predict.exe: tron.obj linear.obj predict.c blas\*.c SFMT\SFMT.c
++	$(CXX) $(CFLAGS) -Fe$(TARGET)\predict.exe tron.obj linear.obj predict.c blas\*.c SFMT\SFMT.c
+ 
+ linear.obj: linear.cpp linear.h
+ 	$(CXX) $(CFLAGS) -c linear.cpp
+ 
+ tron.obj: tron.cpp tron.h
+ 	$(CXX) $(CFLAGS) -c tron.cpp
+ 
+ lib: linear.cpp linear.h linear.def tron.obj
+-	$(CXX) $(CFLAGS) -LD linear.cpp tron.obj blas\*.c -Fe$(TARGET)\liblinear -link -DEF:linear.def
++	$(CXX) $(CFLAGS) -LD linear.cpp tron.obj blas\*.c SFMT\SFMT.c -Fe$(TARGET)\liblinear -link -DEF:linear.def
+ 
+ clean:
+ 	 -erase /Q *.obj $(TARGET)\*.exe $(TARGET)\*.dll $(TARGET)\*.exp $(TARGET)\*.lib
+ 
+unchanged:
+--- a/linear.cpp	2018-10-04 07:00:36.000000000 -0500
++++ b/linear.cpp	2018-12-20 23:21:18.000000000 -0600
+@@ -5,8 +5,48 @@
+ #include <stdarg.h>
+ #include <locale.h>
+ #include "linear.h"
+ #include "tron.h"
++
++#include "SFMT/SFMT.h"
++
++// https://stackoverflow.com/questions/18298280
++#ifndef thread_local
++# if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
++#  define thread_local _Thread_local
++# elif defined _WIN32 && ( \
++       defined _MSC_VER || \
++       defined __ICL || \
++       defined __DMC__ || \
++       defined __BORLANDC__ )
++#  define thread_local __declspec(thread)
++/* note that ICC (linux) and Clang are covered by __GNUC__ */
++# elif defined __GNUC__ || \
++       defined __SUNPRO_C || \
++       defined __xlC__
++#  define thread_local __thread
++# else
++#  error "Cannot define thread_local"
++# endif
++#endif
++
++static thread_local sfmt_t sfmt = {};
++#define rand sfmt_random
++#define RAND_MAX 0x7fffffff
++static const int default_sfmt_seed = 1234;
++static inline int sfmt_random() {
++  return sfmt_genrand_uint32(&sfmt) % RAND_MAX;
++}
++
++void seed_liblinear_PRNG(int seed) { sfmt_init_gen_rand(&sfmt, seed); }
++
++// Seed the SFMT during the program initialization.
++struct sfmt_init_t {
++  sfmt_init_t() { seed_liblinear_PRNG(default_sfmt_seed); };
++};
++sfmt_init_t sfmt_init_;
++
++
+ int liblinear_version = LIBLINEAR_VERSION;
+ typedef signed char schar;
+ template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
+ #ifndef min
+@@ -2466,8 +2507,9 @@
+ 		fold_start[i]=i*l/nr_fold;
+ 
+ 	for(i=0;i<nr_fold;i++)
+ 	{
++		seed_liblinear_PRNG(default_sfmt_seed);
+ 		int begin = fold_start[i];
+ 		int end = fold_start[i+1];
+ 		int j,k;
+ 		struct problem subprob;
+only in patch2:
+unchanged:
+--- a/linear.h	2018-10-04 07:00:36.000000000 -0500
++++ b/linear.h	2018-12-10 22:08:27.000000000 -0600
+@@ -74,8 +74,9 @@
+ int check_probability_model(const struct model *model);
+ int check_regression_model(const struct model *model);
+ void set_print_string_function(void (*print_func) (const char*));
+ 
++void seed_liblinear_PRNG(int seed);
+ #ifdef __cplusplus
+ }
+ #endif
+ 

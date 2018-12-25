@@ -1,0 +1,37 @@
+unchanged:
+--- a/Makefile	2018-10-04 07:00:36.000000000 -0500
++++ b/Makefile	2018-12-20 23:55:34.000000000 -0600
+@@ -1,7 +1,7 @@
+ CXX ?= g++
+ CC ?= gcc
+-CFLAGS = -Wall -Wconversion -O3 -fPIC
++CFLAGS = -Wall -Wconversion -O3 -fPIC -fopenmp
+ LIBS = blas/blas.a
+ SHVER = 3
+ OS = $(shell uname)
+ #LIBS = -lblas
+unchanged:
+--- a/Makefile.win	2018-10-04 07:00:36.000000000 -0500
++++ b/Makefile.win	2018-12-20 23:55:31.000000000 -0600
+@@ -1,6 +1,6 @@
+ CXX = cl.exe
+-CFLAGS = /nologo /O2 /EHsc /I. /D _WIN64 /D _CRT_SECURE_NO_DEPRECATE
++CFLAGS = /openmp /nologo /O2 /EHsc /I. /D _WIN64 /D _CRT_SECURE_NO_DEPRECATE
+ TARGET = windows
+ 
+ all: $(TARGET)\train.exe $(TARGET)\predict.exe lib
+ 
+only in patch2:
+unchanged:
+--- a/linear.cpp	2018-10-04 07:00:36.000000000 -0500
++++ b/linear.cpp	2018-12-21 00:14:55.000000000 -0600
+@@ -2464,8 +2505,9 @@
+ 	}
+ 	for(i=0;i<=nr_fold;i++)
+ 		fold_start[i]=i*l/nr_fold;
+ 
++	#pragma omp parallel for
+ 	for(i=0;i<nr_fold;i++)
+ 	{
+ 		seed_liblinear_PRNG(default_sfmt_seed);
+ 		int begin = fold_start[i];
