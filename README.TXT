@@ -27,16 +27,16 @@ necessary for the second patch is 4.2. Both patches are compatible with Clang
 since version 3.5, but OpenMP support is enabled in Clang by default since
 version 3.8.
 
-On macOS, the distribution of Clang included in Xcode does not support OpenMP,
+On macOS, the distribution of Clang included in Xcode does not include OpenMP,
 which makes it incompatible with the second patch. However, it is possible to
-install a distribution of Clang that supports OpenMP using Homebrew, using the
-following command:
+install both OpenMP and also a distribution of Clang that supports it using
+Homebrew with the following command:
 
-$ brew install llvm
+$ brew install libomp llvm
 
-This command installs LLVM and Clang versions that support OpenMP. These
-compilers can be set for the LIBLINEAR build using 'CC' and 'CXX' environment
-variables, e.g., using the following two commands:
+This command installs the OpenMP library. It also installs the LLVM and Clang
+versions that support OpenMP. These compilers can be set for the LIBLINEAR build
+using 'CC' and 'CXX' environment variables, e.g., using the following two commands:
 
 $ export CC=/usr/local/opt/llvm/bin/clang
 $ export CXX=/usr/local/opt/llvm/bin/clang++
